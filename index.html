@@ -51,6 +51,8 @@ button.del{background:#fee2e2;color:#b91c1c;width:auto;padding:4px 10px;margin:0
 
 <div class="card">
 <h2>3. 쓴 돈 (지출)</h2>
+<label class="muted">날짜</label>
+<input id="eDate" type="date">
 <input id="eDesc" placeholder="내용 (예: 점심, 택시)">
 <div class="row">
 <input id="eAmt" type="number" inputmode="numeric" placeholder="금액">
@@ -95,6 +97,20 @@ function save(){localStorage.setItem(KEY,JSON.stringify(S));render()}
 const fmt=n=>Math.round(n).toLocaleString('ko-KR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function fd(s){
+  if(!s)return '';
+  const p=s.split('-');
+  if(p.length!==3)return s;
+  const w=['일','월','화','수','목','금','토'][new Date(+p[0],+p[1]-1,+p[2]).getDay()];
+  return (+p[1])+'/'+(+p[2])+'('+w+')';
+}
+function sortedExps(){
+  return S.exps.map((e,i)=>({e,i})).sort((a,b)=>(a.e.date||'').localeCompare(b.e.date||'')||a.i-b.i);
+}
 function addContrib(){
   const who=+document.getElementById('cWho').value;
   const amt=+document.getElementById('cAmt').value;
@@ -110,7 +126,8 @@ function addExp(){
   const who=[...document.querySelectorAll('#eWho input:checked')].map(x=>+x.value);
   if(!amt||amt<=0){alert('금액을 입력하세요');return}
   if(!who.length){alert('누구 몫인지 1명 이상 체크하세요');return}
-  S.exps.push({desc,amt,payer,who});
+  const date=document.getElementById('eDate').value||todayStr();
+  S.exps.push({desc,amt,payer,who,date});
   document.getElementById('eDesc').value='';
   document.getElementById('eAmt').value='';
   save();
@@ -140,8 +157,9 @@ function render(){
   // lists
   document.getElementById('cList').innerHTML=S.contribs.map((c,i)=>
     `<div class="item"><span>${esc(S.names[c.who])}</span><span>${fmt(c.amt)} <button class="del" onclick="delC(${i})">삭제</button></span></div>`).join('');
-  document.getElementById('eList').innerHTML=S.exps.map((e,i)=>
-    `<div class="item"><span>${esc(e.desc)}<small>${e.payer==='fund'?'회비에서':esc(S.names[e.payer])+' 개인결제'} · ${e.who.length}명 분담</small></span><span>${fmt(e.amt)} <button class="del" onclick="delE(${i})">삭제</button></span></div>`).join('');
+  const ed=document.getElementById('eDate'); if(!ed.value)ed.value=todayStr();
+  document.getElementById('eList').innerHTML=sortedExps().map(({e,i})=>
+    `<div class="item"><span>${e.date?'<b>'+fd(e.date)+'</b> ':''}${esc(e.desc)}<small>${e.payer==='fund'?'회비에서':esc(S.names[e.payer])+' 개인결제'} · ${e.who.length}명 분담</small></span><span>${fmt(e.amt)} <button class="del" onclick="delE(${i})">삭제</button></span></div>`).join('');
   // calc
   const paid=Array(n).fill(0), share=Array(n).fill(0);
   let C=0,F=0,total=0;
@@ -199,7 +217,7 @@ function makeImage(){
   S.contribs.forEach(c=>items.push({k:'row',l:S.names[c.who],r:fmt(c.amt)}));
   items.push({k:'row',l:'합계',r:fmt(d.C),b:1});
   items.push({k:'sec',l:'지출 내역'});
-  S.exps.forEach(e=>items.push({k:'row',l:e.desc,s:(e.payer==='fund'?'회비에서':S.names[e.payer]+' 개인결제')+' · '+e.who.length+'명 분담',r:fmt(e.amt)}));
+  sortedExps().forEach(({e})=>items.push({k:'row',l:(e.date?fd(e.date)+'  ':'')+e.desc,s:(e.payer==='fund'?'회비에서':S.names[e.payer]+' 개인결제')+' · '+e.who.length+'명 분담',r:fmt(e.amt)}));
   items.push({k:'row',l:'총 지출',r:fmt(d.total)+wonTxt(d.total),b:1});
   items.push({k:'sec',l:'정산 결과'});
   items.push({k:'row',l:'걷은 회비',r:fmt(d.C)});
